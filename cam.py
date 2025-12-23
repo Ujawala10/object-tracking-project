@@ -4,14 +4,15 @@ import math
 import time
 
 # ================= CONFIG =================
-VIDEO_PATH = "video.mp4"
+VIDEO_PATH = "video.mp4"          
+OUTPUT_PATH = "output_detected.mp4"  
 CONF_THRESH = 0.5
 PIXEL_TO_METER = 0.02
 
-# ================= MODEL =================
+# ================= LOAD MODEL =================
 model = YOLO("yolov8s.pt")
 
-# ================= VIDEO =================
+# ================= VIDEO INPUT =================
 cap = cv2.VideoCapture(VIDEO_PATH)
 if not cap.isOpened():
     print("Error: Cannot open video")
@@ -23,7 +24,20 @@ if video_fps == 0:
 
 WAIT_TIME = int(1000 / video_fps)
 
-print(f"[INFO] FPS locked at {video_fps}, waitKey = {WAIT_TIME} ms")
+frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+# ================= VIDEO OUTPUT (NEW) =================
+fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+out = cv2.VideoWriter(
+    OUTPUT_PATH,
+    fourcc,
+    video_fps,
+    (frame_width, frame_height)
+)
+
+print(f"[INFO] FPS locked at {video_fps}")
+print("[INFO] Output video will be saved as output_detected.mp4")
 
 # ================= MOUSE =================
 mouse_x, mouse_y = 0, 0
@@ -36,7 +50,7 @@ cv2.namedWindow("Detection", cv2.WINDOW_NORMAL)
 cv2.setMouseCallback("Detection", mouse_event)
 
 # ================= SIMPLE TRACKING =================
-prev_centers = {}   # id -> (x, y, time)
+prev_centers = {}
 next_id = 1
 
 def assign_id(cx, cy):
@@ -106,11 +120,10 @@ while True:
                 hover_text = f"This is a {label}"
 
     # ---------- CROWD COUNT ----------
-    h, w, _ = frame.shape
     cv2.putText(
         frame,
         f"People Count: {crowd_count}",
-        (w - 320, 40),
+        (20, 40),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.9,
         (0, 0, 255),
@@ -121,18 +134,24 @@ while True:
         cv2.putText(
             frame,
             hover_text,
-            (30, 60),
+            (20, 80),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.9,
             (0, 255, 255),
             3
         )
 
+    # ================= SAVE OUTPUT (NEW) =================
+    out.write(frame)
+
     cv2.imshow("Detection", frame)
+
     prev_centers = current_centers.copy()
 
     if cv2.waitKey(WAIT_TIME) & 0xFF == ord('q'):
         break
 
+# ================= CLEANUP =================
 cap.release()
+out.release()
 cv2.destroyAllWindows()
